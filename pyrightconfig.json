@@ -1,0 +1,14 @@
+{
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        "wot-src/sources/res/scripts/client",
+        "wot-src/sources/res/scripts/common",
+        "wot-src/sources/res/scripts/client_common"
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,13 @@
+{
+  "python.autoComplete.extraPaths": [
+    "wot-src/sources/res/scripts/client",
+    "wot-src/sources/res/scripts/common",
+    "wot-src/sources/res/scripts/client_common"
+  ],
+  "python.analysis.extraPaths": [
+    "wot-src/sources/res/scripts/client",
+    "wot-src/sources/res/scripts/common",
+    "wot-src/sources/res/scripts/client_common"
+  ],
+  "python.analysis.userFileIndexingLimit": 20000
+}
