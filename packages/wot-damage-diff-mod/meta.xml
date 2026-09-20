@@ -1,0 +1,6 @@
+<mod>
+    <name>me.wot-damage-diff</name>
+    <description>In-battle HUD: live difference between damage dealt and damage taken.</description>
+    <version>{{VERSION}}</version>
+    <author>Your Name</author>
+</mod>
