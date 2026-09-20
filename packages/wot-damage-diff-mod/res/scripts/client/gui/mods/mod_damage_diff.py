@@ -76,6 +76,7 @@ def _cursor_visible():
 
 class _DamageDiffOverlay(object):
     def __init__(self):
+        self._dealt = 0
         self._taken = 0
         self._ctrl = None
         self._label = None
@@ -101,6 +102,7 @@ class _DamageDiffOverlay(object):
         self._unsubscribe()
         self._unbind_input()
         self._destroy_label()
+        self._dealt = 0
         self._taken = 0
 
     def _subscribe(self):
@@ -113,8 +115,11 @@ class _DamageDiffOverlay(object):
             self._retry_cb = BigWorld.callback(0.2, self._retry_subscribe)
             return
         self._ctrl = ctrl
-        ctrl.onTotalEfficiencyUpdated += self._on_total_efficiency_updated
         ctrl.onPersonalEfficiencyReceived += self._on_efficiency_received
+        if self._is_controlling_own_vehicle():
+            live_dealt = self._live_dealt()
+            if live_dealt > self._dealt:
+                self._dealt = live_dealt
 
     def _retry_subscribe(self):
         self._retry_cb = None
@@ -128,10 +133,6 @@ class _DamageDiffOverlay(object):
         self._ctrl = None
         if ctrl is None:
             return
-        try:
-            ctrl.onTotalEfficiencyUpdated -= self._on_total_efficiency_updated
-        except Exception:
-            pass
         try:
             ctrl.onPersonalEfficiencyReceived -= self._on_efficiency_received
         except Exception:
@@ -222,22 +223,46 @@ class _DamageDiffOverlay(object):
         self._apply_position()
         self._refresh()
 
-    def _on_total_efficiency_updated(self, _diff):
-        self._refresh()
+    def _is_controlling_own_vehicle(self):
+        try:
+            session = _session_provider()
+            if session is None or session.shared is None:
+                return True
+            veh_state = session.shared.vehicleState
+            arena_dp = session.getArenaDP()
+            if veh_state is None or arena_dp is None:
+                return True
+            controlling_id = veh_state.getControllingVehicleID()
+            player_id = arena_dp.getPlayerVehicleID()
+            if not controlling_id or not player_id:
+                return True
+            return controlling_id == player_id
+        except Exception:
+            return True
 
     def _on_efficiency_received(self, events_list):
+        if not self._is_controlling_own_vehicle():
+            return
+        changed = False
         for info in events_list:
             try:
-                if info.getType() != _PET.RECEIVED_DAMAGE:
+                etype = info.getType()
+                if etype not in (_PET.DAMAGE, _PET.RECEIVED_DAMAGE):
                     continue
                 if getattr(info, 'isHidden', lambda: False)():
                     continue
-                damage = info.getDamage()
-                if damage:
-                    self._taken += int(damage)
+                damage = int(info.getDamage() or 0)
+                if damage <= 0:
+                    continue
+                if etype == _PET.DAMAGE:
+                    self._dealt += damage
+                else:
+                    self._taken += damage
+                changed = True
             except Exception:
-                _LOGGER.exception('failed to apply received-damage event')
-        self._refresh()
+                _LOGGER.exception('failed to apply efficiency event')
+        if changed:
+            self._refresh()
 
     def _on_key_down(self, event):
         if event.key != Keys.KEY_LEFTMOUSE or self._label is None or self._dragging:
@@ -304,7 +329,7 @@ class _DamageDiffOverlay(object):
             half_w = max(0.012 * max(len(text), 1), half_w)
         return half_w + 0.01, half_h + 0.01
 
-    def _dealt(self):
+    def _live_dealt(self):
         ctrl = self._ctrl
         if ctrl is None:
             return 0
@@ -317,7 +342,7 @@ class _DamageDiffOverlay(object):
         label = self._label
         if label is None:
             return
-        delta = self._dealt() - self._taken
+        delta = self._dealt - self._taken
         if delta > 0:
             text = '+%d' % delta
             colour = _COLOUR_POS
