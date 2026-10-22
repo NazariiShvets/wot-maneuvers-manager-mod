@@ -2,5 +2,5 @@
     <name>eagle.maneuvers-manager</name>
     <description>Hangar menu: open Maneuvers Manager with the WG access token, periphery_id, and spa_id.</description>
     <version>{{VERSION}}</version>
-    <author>Your Name</author>
+    <author>Eaglesong666</author>
 </mod>
