@@ -1,6 +1,6 @@
 <mod>
-    <name>me.maneuvers-manager</name>
-    <description>Hangar menu: open local auth URL with WG access token, periphery_id, and spa_id.</description>
+    <name>eagle.maneuvers-manager</name>
+    <description>Hangar menu: open Maneuvers Manager with the WG access token, periphery_id, and spa_id.</description>
     <version>{{VERSION}}</version>
     <author>Your Name</author>
 </mod>

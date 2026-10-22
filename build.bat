@@ -48,8 +48,10 @@ if not exist "%PKG_ROOT%\build.cfg" (
 )
 
 set "MOD_ENTRY="
+set "AUTH_ORIGIN="
 for /f "usebackq tokens=1,* delims==" %%a in ("%PKG_ROOT%\build.cfg") do (
   if /I "%%a"=="MOD_ENTRY" set "MOD_ENTRY=%%b"
+  if /I "%%a"=="AUTH_ORIGIN" set "AUTH_ORIGIN=%%b"
 )
 if not defined MOD_ENTRY (
   echo [ERROR] MOD_ENTRY missing in %PKG_ROOT%\build.cfg
@@ -80,7 +82,8 @@ set "configPath=%CD%\build\res\scripts\client\gui\mods\%MOD_ENTRY%"
 if exist "%configPath%" (
   powershell -NoProfile -Command ^
     "(Get-Content '%configPath%' -Raw -Encoding utf8) " ^
-    "-replace '\{\{VERSION\}\}','%v%' | " ^
+    "-replace '\{\{VERSION\}\}','%v%' " ^
+    "-replace '\{\{AUTH_ORIGIN\}\}','%AUTH_ORIGIN%' | " ^
     "Set-Content '%configPath%' -Encoding utf8"
 ) else (
   echo [WARN] %configPath% not found.
@@ -89,6 +92,12 @@ if exist "%configPath%" (
 C:\Python27\python.exe -m compileall "build"
 if errorlevel 1 (
   echo [ERROR] Python compile failed.
+  exit /b 1
+)
+
+py -3 "%CD%\tools\compile_gettext_mo.py" "%CD%\build"
+if errorlevel 1 (
+  echo [ERROR] Gettext mo compile failed.
   exit /b 1
 )
 
@@ -122,6 +131,16 @@ if errorlevel 1 (echo [ERROR] 7-Zip failed packing swf. & cd .. & exit /b 1)
 if errorlevel 1 (echo [ERROR] 7-Zip failed packing meta.xml. & cd .. & exit /b 1)
 "%SEVENZIP%" a -tzip -mx=0 "%folder%" ".\*.png" -r >nul
 if errorlevel 1 (echo [ERROR] 7-Zip failed packing png. & cd .. & exit /b 1)
+dir /s /b "*.mo" >nul 2>&1
+if not errorlevel 1 (
+  "%SEVENZIP%" a -tzip -mx=0 "%folder%" ".\*.mo" -r >nul
+  if errorlevel 1 (echo [ERROR] 7-Zip failed packing mo. & cd .. & exit /b 1)
+)
+dir /s /b "*.json" >nul 2>&1
+if not errorlevel 1 (
+  "%SEVENZIP%" a -tzip -mx=0 "%folder%" ".\*.json" -r >nul
+  if errorlevel 1 (echo [ERROR] 7-Zip failed packing json. & cd .. & exit /b 1)
+)
 
 cd ..
 

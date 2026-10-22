@@ -1,0 +1,3 @@
+[
+    {"type": "String", "id": "R.strings.menu.headerButtons.maneuversManager", "path": "eagle.maneuvers_manager.menu.extend", "parameters": {"key": "headerButtons/maneuversManager"}}
+]

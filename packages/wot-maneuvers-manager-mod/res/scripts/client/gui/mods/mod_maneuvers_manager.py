@@ -10,7 +10,6 @@ from gui import SystemMessages
 from gui.impl.dialogs import dialogs
 from gui.impl.dialogs.builders import FormattedSimpleDialogBuilder
 from gui.impl.gen.view_models.constants.dialog_presets import DialogPresets
-from gui.impl.gen.view_models.views.lobby.hangar.main_menu_model import MainMenuModel
 from gui.impl.pub.dialog_window import DialogButtons
 from gui.impl.lobby.hangar.presenters.utils import MenuItemEntry
 from gui.shared.system_factory import registerMenuItems
@@ -22,6 +21,8 @@ from skeletons.gui.web import IWebController
 from wg_async import wg_async, wg_await, await_callback
 
 MOD_VERSION = '{{VERSION}}'
+# Replaced at build time (see packages/wot-maneuvers-manager-mod/build.cfg).
+AUTH_ORIGIN = '{{AUTH_ORIGIN}}'
 _LOGGER = logging.getLogger(__name__)
 
 MENU_ID_MANEUVERS = 'maneuversManager'
@@ -29,22 +30,12 @@ MENU_ID_MANEUVERS = 'maneuversManager'
 hangarSpace = dependency.instance(IHangarSpace)
 
 
-def _ssr_mod_installed():
-    try:
-        __import__('server_side_replay', level=0)
-        return True
-    except ImportError:
-        return False
-
-
-def _truncate_preview(s, head=14, tail=6):
-    if not s or len(s) <= head + tail + 3:
-        return s or u''
-    return s[:head] + u'…' + s[-tail:]
+def _auth_base():
+    return AUTH_ORIGIN.rstrip('/') + '/auth'
 
 
 def _build_auth_url(access_token, periphery_id, spa_id):
-    # Local auth app URL; token + realm ids (same as WG clan/WGSH flows).
+    # Prod or local origin from AUTH_ORIGIN; token + realm ids (same as WG clan/WGSH flows).
     unicode_type = type(u'')
     if access_token is None:
         return None
@@ -59,7 +50,7 @@ def _build_auth_url(access_token, periphery_id, spa_id):
             ('spa_id', str(spa_id)),
         ]
     )
-    return 'http://localhost:3000/auth?' + query
+    return _auth_base() + '?' + query
 
 
 @adisp_process
@@ -111,44 +102,33 @@ def _run_access_token_only():
     )
 
 
-def _dialog_body(result):
-    lines = []
-    err = result.get(u'error')
-    if err:
-        lines.append(u'Error: ' + err)
-        lines.append(u'')
-        lines.append(u'Check python.log for details.')
-        return u'\n'.join(lines)
-
-    tok = result.get(u'access_token')
-    lines.append(u'OAuth access token (WG client).')
-    lines.append(u'')
-    lines.append(u'access_token: ' + (u'(ok) ' + _truncate_preview(tok) if tok else u'(missing)'))
-    lines.append(u'periphery_id: %s' % result.get(u'periphery_id'))
-    lines.append(u'spa_id: %s' % result.get(u'spa_id'))
-    lines.append(u'')
-    lines.append(u'Confirm opens your browser at http://localhost:3000/auth with token and ids.')
-    return u'\n'.join(lines)
-
-
 @wg_async
 def _show_maneuvers_modal():
     result = yield wg_await(_run_access_token_only())
     if not isinstance(result, dict):
         result = {u'error': u'Unexpected result'}
 
-    body = _dialog_body(result)
+    err = result.get(u'error')
+    if err:
+        _LOGGER.error('Maneuvers Manager: %s', err)
+        body = u'Could not open Maneuvers Manager. Try again in a moment.'
+        buttons = [{DialogButtons.CANCEL: 'Close'}]
+        default_button = DialogButtons.CANCEL
+    else:
+        body = u'Open Maneuvers Manager in your browser?'
+        buttons = [
+            {DialogButtons.SUBMIT: 'Open'},
+            {DialogButtons.CANCEL: 'Close'},
+        ]
+        default_button = DialogButtons.SUBMIT
 
     builder = FormattedSimpleDialogBuilder()
     builder.setMessagesAndButtons(
         DialogPresets.INFO,
         'Maneuvers Manager',
         body,
-        [
-            {DialogButtons.SUBMIT: 'Open browser'},
-            {DialogButtons.CANCEL: 'Close'},
-        ],
-        DialogButtons.SUBMIT,
+        buttons,
+        default_button,
         None,
     )
     built = builder.buildInLobby()
@@ -161,10 +141,6 @@ def _show_maneuvers_modal():
     if dlg_result.result == DialogButtons.SUBMIT:
         err = result.get(u'error')
         if err:
-            SystemMessages.pushMessage(
-                text=u'Cannot open browser: ' + err,
-                type=SystemMessages.SM_TYPE.Warning,
-            )
             return
         url = _build_auth_url(
             result.get(u'access_token'),
@@ -172,15 +148,16 @@ def _show_maneuvers_modal():
             result.get(u'spa_id'),
         )
         if not url:
+            _LOGGER.error('Maneuvers Manager: no access token to open')
             SystemMessages.pushMessage(
-                text=u'No access token to open.',
+                text=u'Could not open Maneuvers Manager. Try again in a moment.',
                 type=SystemMessages.SM_TYPE.Warning,
             )
             return
         try:
             BigWorld.wg_openWebBrowser(url)
             SystemMessages.pushMessage(
-                text=u'Opening http://localhost:3000/auth …',
+                text=u'Opening Maneuvers Manager…',
                 type=SystemMessages.SM_TYPE.Information,
             )
         except Exception:
@@ -206,28 +183,12 @@ def init():
         ),
     )
 
-    if not _ssr_mod_installed():
-        registerMenuItems(
-            'hangar',
-            OrderedDict(
-                [
-                    (
-                        MainMenuModel.REPLAYS,
-                        MenuItemEntry(_on_open_maneuvers, lambda: True, lambda: True),
-                    ),
-                ]
-            ),
-        )
-
     hangarSpace.onSpaceCreate += _on_hangar_space_create
 
 
 def _on_hangar_space_create():
     hangarSpace.onSpaceCreate -= _on_hangar_space_create
-    if _ssr_mod_installed():
-        hint = u'Open Maneuvers from the hangar bottom menu (maneuvers item), if your client shows it.'
-    else:
-        hint = u'Open Maneuvers from the Replays button in the hangar bottom menu (reused while SSR mod is absent).'
+    hint = u'Open Maneuvers Manager from the hangar menu.'
     SystemMessages.pushMessage(
         text=(u'Maneuvers Manager v%s — %s') % (MOD_VERSION, hint),
         type=SystemMessages.SM_TYPE.InformationHeader,

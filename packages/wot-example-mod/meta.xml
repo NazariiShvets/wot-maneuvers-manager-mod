@@ -1,6 +1,0 @@
-<mod>
-    <name>me.wot-example</name>
-    <description>Minimal example mod (template). Replace with your own logic.</description>
-    <version>{{VERSION}}</version>
-    <author>Your Name</author>
-</mod>

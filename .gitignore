@@ -6,3 +6,7 @@ dist/**
 
 wot-src/
 as3/bin
+
+packages/*
+!packages/wot-maneuvers-manager-mod/
+
